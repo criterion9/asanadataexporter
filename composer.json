@@ -1,0 +1,27 @@
+{
+    "name": "criterion9/asanadataexporter",
+    "description": "A data export tool for Asana",
+    "license": "LGPL2.1",
+    "keywords": [
+        "asana",
+        "export"
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.0 || ^8.1 || ^8.2",
+        "asana/asana": "v1.0.6"
+    },
+    "config": {
+        "preferred-install": "dist",
+        "framework": {
+            "php":"8.2"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Criterion9\\AsanaDataExporter\\": "src/"
+        }
+        
+    }
+}
