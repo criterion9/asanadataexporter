@@ -363,12 +363,15 @@ MA 02110-1301  USA', null, null, '* ');
 
     private function export(OutputInterface $output, SymfonyStyle $io): void {
         $this->currentSection->clear();
-        $projectprogress = $io->createProgressBar();
-        $taskprogress = new ProgressBar($output);
-        $attachmentprogress = new ProgressBar($output);
+        $projectsection = $output->section('Projects');
+        $projectprogress = new ProgressBar($projectsection);
+        $tasksection = $output->section('Tasks');
+        $taskprogress = new ProgressBar($tasksection);
+        $attachmentsection = $output->section('Attachment');
+        $attachmentprogress = new ProgressBar($attachmentsection);
         $basedir = $this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder;
         $projectprogress->start(count($this->project));
-        $io->newLine();
+        //$io->newLine();
         foreach ($this->project as $p) {
             if (!isset($p->team)) {
                 $io->error('Team wasn\'t set for project: ' . $p->name);
@@ -378,7 +381,7 @@ MA 02110-1301  USA', null, null, '* ');
             if (!is_dir($projectdir)) {
                 mkdir($projectdir, 0777, true);
             }
-            sleep(max(round(rand(0, 55) / 100),0));
+            $io->getErrorStyle()->text('Starting project '.$p->name);
             $res = $this->exporter->exportProjectTasks($projectdir,
                     ['include_subtasks' => $this->includeSubtasks, 'projects' => [$p], 'progress' => $taskprogress]);
             if ($this->includeAttachments) {
@@ -390,6 +393,7 @@ MA 02110-1301  USA', null, null, '* ');
             $this->exporter->writeProject($projectdir, $p, isset($p->status) ? $p->status : []);
             $this->exporter->clearAttachmentCache();
             $projectprogress->advance();
+            sleep(max(round(rand(0, 75) / 100),0));
         }
         $projectprogress->finish();
     }

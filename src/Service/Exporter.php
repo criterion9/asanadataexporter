@@ -131,6 +131,7 @@ class Exporter {
                 if (isset($settings['progress'])) {
                     $settings['progress']->advance();
                 }
+                sleep(max(round(rand(0, 75) / 100),0));
             }
             if (isset($settings['progress'])) {
                 $settings['progress']->finish();
@@ -156,7 +157,7 @@ class Exporter {
                     'text' => $story->text
                 ];
             }
-            sleep(max(round(rand(0, 55) / 100),0));
+            sleep(max(round(rand(0, 85) / 100),0));
         }
 
         foreach ($client->attachments->getAttachmentsForObject(['parent' => $gid]) as $attachment) {
@@ -170,7 +171,7 @@ class Exporter {
                 $this->attachments[] = $tmp;
             }
             $comments[] = $tmp;
-            sleep(max(round(rand(0, 55) / 100),0));
+            sleep(max(round(rand(0, 85) / 100),0));
         }
 
         usort($comments, function ($a, $b) {
@@ -182,7 +183,7 @@ class Exporter {
                 if ($result['status'] == 'OK') {
                     $subtasks[] = $result['task'];
                 }
-                sleep(max(round(rand(0, 55) / 100),0));
+                sleep(max(round(rand(0, 85) / 100),0));
             }
         }
 
@@ -246,7 +247,7 @@ class Exporter {
                         file_put_contents($attachment_directory . DIRECTORY_SEPARATOR . $l['text'], $content);
                     }
                 }
-                sleep(max(round(rand(0, 55) / 100),0));
+                sleep(max(round(rand(0, 75) / 100),0));
                 $progress->advance();
             }
             if (!is_null($progress)) {
