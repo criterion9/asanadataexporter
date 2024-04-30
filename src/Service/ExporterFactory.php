@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Description of ConfigProvider
+ * Description of ExporterFactory
  * 
  * PHP version 8
  * 
@@ -33,15 +33,14 @@
  * @link      https://github.com/criterion9/asanadataexporter
  */
 
-namespace Criterion9\AsanaDataExporter;
+namespace Criterion9\AsanaDataExporter\Service;
 
-use Criterion9\AsanaDataExporter\Command\Export;
-use Criterion9\AsanaDataExporter\Service\Exporter;
-use Criterion9\AsanaDataExporter\Service\ExporterFactory;
-use Laminas\ServiceManager\AbstractFactory\ConfigAbstractFactory;
+use Criterion9\AsanaDataExporter\Module;
+use Laminas\ServiceManager\Factory\AbstractFactoryInterface;
+use Psr\Container\ContainerInterface;
 
 /**
- * Description of ConfigProvider
+ * Description of ExporterFactory
  *
  * @category  CategoryName
  * @package   PackageName
@@ -52,50 +51,15 @@ use Laminas\ServiceManager\AbstractFactory\ConfigAbstractFactory;
  * @link      
  * @since     Class available since Release 0.0.0
  */
-class ConfigProvider {
+class ExporterFactory implements AbstractFactoryInterface {
 
-    const VERSION = '@release_version@';
-
-    /**
-     * Returns the configuration array
-     */
-    public function __invoke(): array {
-        return [
-            'dependencies' => $this->getDependencies(),
-            'templates' => $this->getTemplates(),
-            'laminas-cli' => $this->getCliConfig()
-        ];
+    //put your code here
+    public function __invoke(ContainerInterface $container, $requestedName, array $options = null): mixed {
+        $config = $container->get('config')['asanadataexporter'] ?? [];
+        return new Exporter($config);
     }
 
-    /**
-     * Returns the cli configuration
-     */
-    public function getCliConfig(): array {
-        return [
-            'commands' => [
-                'asanadataexporter:export' => Export::class
-            ]
-        ];
-    }
-
-    /**
-     * Returns the container dependencies
-     */
-    public function getDependencies(): array {
-        return [
-            'factories' => [
-                Exporter::class => ExporterFactory::class,
-            ]
-        ];
-    }
-
-    /**
-     * Returns the templates configuration
-     */
-    public function getTemplates(): array {
-        return [
-            'paths' => [
-            ],
-        ];
+    public function canCreate(ContainerInterface $container, $requestedName): bool {
+        return true;
     }
 }
