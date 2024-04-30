@@ -1,22 +1,48 @@
 {
     "name": "criterion9/asanadataexporter",
-    "description": "A data export tool for Asana",
+    "description": "A data export tool for Asana for Laminas, Mezzio, and standalone + console",
     "license": "LGPL2.1",
     "keywords": [
         "asana",
-        "export"
+        "export",
+        "laminas",
+        "mezzio",
+        "standalone"
     ],
-    "minimum-stability": "dev",
+    "authors" : [
+        {
+            "name": "Andrew Wallace",
+            "email": "criterion9@proton.me"
+        }
+    ],
+    "repositories": [
+      {
+        "type": "git",
+        "url": "https://github.com/criterion9/httpful.git"
+      }
+    ],
     "prefer-stable": true,
     "require": {
         "php": "^8.0 || ^8.1 || ^8.2",
-        "asana/asana": "v1.0.6"
+        "ext-zip": "*",
+        "asana/asana": ">=v1.0.6",
+        "symfony/console": ">=v7.0.6",
+        "laminas/laminas-servicemanager": ">=4.1.0",
+        "laminas/laminas-hydrator": ">=4.15.0",
+        "nategood/httpful": ">=0.3.2.1",
+        "symfony/process": ">=7.0.4"
+    },
+    "suggest": {
+        "symfony/console": "For running as a console command"
     },
     "config": {
         "preferred-install": "dist",
         "framework": {
             "php":"8.2"
         }
+    },
+    "scripts": {
+        "asanadataexport":"bin/console asanadataexporter:export"
     },
     "autoload": {
         "psr-4": {
