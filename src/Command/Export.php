@@ -378,7 +378,7 @@ MA 02110-1301  USA', null, null, '* ');
             if (!is_dir($projectdir)) {
                 mkdir($projectdir, 0777, true);
             }
-            usleep((rand(0, 150) / 100) + 1);
+            sleep(max(round(rand(0, 55) / 100),0));
             $res = $this->exporter->exportProjectTasks($projectdir,
                     ['include_subtasks' => $this->includeSubtasks, 'projects' => [$p], 'progress' => $taskprogress]);
             if ($this->includeAttachments) {
