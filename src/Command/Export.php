@@ -84,6 +84,7 @@ class Export extends Command {
         $this->addOption('include_attachments', null, InputOption::VALUE_OPTIONAL, 'Whether to export attachments, default is no');
         $this->addOption('include_projectstatus', null, InputOption::VALUE_OPTIONAL, 'Whether to export project statuses, default is yes');
         $this->addOption('compress_output', null, InputOption::VALUE_OPTIONAL, 'Whether to compress the output, default is yes');
+        $this->addOption('speed', null, InputOption::VALUE_OPTIONAL,'The speed [slow, normal, fast] to run the export requests, the default is normal', 'normal');
     }
 
     protected function initialize(InputInterface $input, OutputInterface $output): void {
@@ -118,6 +119,8 @@ MA 02110-1301  USA', null, null, '* ');
         if (empty($this->compressEnabled)) {
             $this->compressEnabled = $this->config['output']['compress'];
         }
+        $speed = in_array($input->getOption('speed'),['slow','normal','fast'])?$input->getOption('speed'):'normal';
+        $this->exporter->setSpeed($speed);
         $this->initialize = Command::SUCCESS;
     }
 
@@ -365,10 +368,15 @@ MA 02110-1301  USA', null, null, '* ');
         $this->currentSection->clear();
         $projectsection = $output->section('Projects');
         $projectprogress = new ProgressBar($projectsection);
+        $projectprogress->setOverwrite(true);
         $tasksection = $output->section('Tasks');
         $taskprogress = new ProgressBar($tasksection);
+        $taskprogress->setOverwrite(true);
+        $taskprogress->start();
         $attachmentsection = $output->section('Attachment');
         $attachmentprogress = new ProgressBar($attachmentsection);
+        $attachmentprogress->setOverwrite(true);
+        $attachmentprogress->start();
         $basedir = $this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder;
         $projectprogress->start(count($this->project));
         //$io->newLine();
@@ -384,16 +392,18 @@ MA 02110-1301  USA', null, null, '* ');
             $io->getErrorStyle()->text('Starting project '.$p->name);
             $res = $this->exporter->exportProjectTasks($projectdir,
                     ['include_subtasks' => $this->includeSubtasks, 'projects' => [$p], 'progress' => $taskprogress]);
+            sleep(1);
             if ($this->includeAttachments) {
                 if (!is_dir($projectdir . DIRECTORY_SEPARATOR . 'attachments')) {
                     mkdir($projectdir . DIRECTORY_SEPARATOR . 'attachments', 0777, true);
                 }
                 $this->exporter->fetchAttachments($projectdir, [], $attachmentprogress, ['progress' => $attachmentprogress]);
+                sleep(1);
             }
             $this->exporter->writeProject($projectdir, $p, isset($p->status) ? $p->status : []);
             $this->exporter->clearAttachmentCache();
             $projectprogress->advance();
-            sleep(max(round(rand(0, 75) / 100),0));
+            //sleep(max(round(rand(0, 85) / 100),0));
         }
         $projectprogress->finish();
     }

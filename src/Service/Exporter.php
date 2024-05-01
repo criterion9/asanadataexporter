@@ -57,13 +57,33 @@ use ZipArchive;
  */
 class Exporter {
 
+    const __SLOW = 1, __NORMAL = 3, __FAST = 5;
     private $access_token, $me;
-    protected $config, $client, $attachments, $statusHeaders = [
+    protected $config, $client, $attachments, $lastRest, $speed, $statusHeaders = [
                 'html_text', 'resource_type', 'resource_subtype', 'title', 'author', 'created_at', 'modified_at'
     ];
 
     public function __construct($config = []) {
         $this->config = $config;
+        $this->speed = self::__NORMAL;
+    }
+    
+    public function setSpeed($speed = self::__NORMAL){
+        if(in_array($speed, [self::__SLOW,self::__NORMAL, self::__FAST])){
+            $this->speed = $speed;
+        }
+    }
+    
+    private function restTime() {
+        if(($this->lastRest - time()) >= 1*max(($this->speed/2),1)){
+            $toRest = 1;
+        } else {
+            $toRest = max(round(rand(0, (90/$this->speed)) / 100),0);
+        }
+        if($toRest){
+            sleep(1);
+            $this->lastRest = time();
+        }
     }
 
     public function setToken(string $token): void {
@@ -123,15 +143,15 @@ class Exporter {
         foreach ($projects as $project) {
             $filter['project'] = $project->gid;
             if (isset($settings['progress'])) {
-                $settings['progress']->start();
+                $settings['progress']->clear();
             }
             foreach ($client->tasks->findAll($filter, ['page_size' => 100]) as $t) {
+                $this->restTime();
                 $result = $this->get_task($t->gid, $settings);
                 $tasks[is_object($result['task']) ? $result['task']->gid : $result['task']['gid']] = $result['task'];
                 if (isset($settings['progress'])) {
                     $settings['progress']->advance();
                 }
-                sleep(max(round(rand(0, 75) / 100),0));
             }
             if (isset($settings['progress'])) {
                 $settings['progress']->finish();
@@ -148,30 +168,33 @@ class Exporter {
 
         $client = $this->getClient();
         $task_data = $client->tasks->getTask($gid);
+        $this->restTime();
         $include_subtasks = isset($settings['include_subtasks']) ? $settings['include_subtasks'] : $this->config['output']['include_subtasks'];
         $include_attachments = isset($settings['include_attachments']) ? $settings['include_attachments'] : $this->config['output']['include_attachments'];
         foreach ($client->stories->getStoriesForTask($gid) as $story) {
+            $this->restTime();
             if ($story->type == 'comment') {
                 $comments[] = [
                     'created_at' => $story->created_at,
                     'text' => $story->text
                 ];
             }
-            sleep(max(round(rand(0, 85) / 100),0));
         }
 
-        foreach ($client->attachments->getAttachmentsForObject(['parent' => $gid]) as $attachment) {
-            $attachment_data = $client->attachments->findById($attachment->gid);
-            $tmp = [
-                'created_at' => $attachment_data->created_at,
-                'text' => $attachment_data->name,
-                'url' => $attachment_data->view_url
-            ];
-            if ($include_attachments) {
-                $this->attachments[] = $tmp;
+        if ($include_attachments) {
+            foreach ($client->attachments->getAttachmentsForObject(['parent' => $gid]) as $attachment) {
+                $this->restTime();
+                $attachment_data = $client->attachments->findById($attachment->gid);
+                $tmp = [
+                    'created_at' => $attachment_data->created_at,
+                    'text' => $attachment_data->name,
+                    'url' => $attachment_data->view_url
+                ];
+                if ($include_attachments) {
+                    $this->attachments[] = $tmp;
+                }
+                $comments[] = $tmp;
             }
-            $comments[] = $tmp;
-            sleep(max(round(rand(0, 85) / 100),0));
         }
 
         usort($comments, function ($a, $b) {
@@ -179,11 +202,11 @@ class Exporter {
         });
         if ($include_subtasks) {
             foreach ($client->tasks->getSubtasksForTask($gid) as $subtask) {
+                $this->restTime();
                 $result = $this->get_task($subtask->gid, $settings);
                 if ($result['status'] == 'OK') {
                     $subtasks[] = $result['task'];
                 }
-                sleep(max(round(rand(0, 85) / 100),0));
             }
         }
 
@@ -227,7 +250,7 @@ class Exporter {
         $list = ($list != []) ? $list : (isset($this->attachments) ? $this->attachments : []);
         if ($list != []) {
             if (!is_null($progress)) {
-                $progress->start();
+                $progress->clear();
             }
             foreach ($list as $l) {
                 if (!file_exists($attachment_directory . DIRECTORY_SEPARATOR . $l['text'])) {
@@ -247,7 +270,7 @@ class Exporter {
                         file_put_contents($attachment_directory . DIRECTORY_SEPARATOR . $l['text'], $content);
                     }
                 }
-                sleep(max(round(rand(0, 75) / 100),0));
+                $this->restTime();
                 $progress->advance();
             }
             if (!is_null($progress)) {
@@ -432,6 +455,7 @@ class Exporter {
         $client = $this->getClient();
         $ret = [];
         foreach ($client->statusupdates->getStatusesForObject(['parent' => $project->gid], ['iterator_type' => false, 'page_size' => null, 'opt_fields' => implode(',', $this->statusHeaders)]) as $row) {
+            $this->restTime();
             $ret[] = $row;
         }
         return $ret;
@@ -449,6 +473,7 @@ class Exporter {
         } else {
             $res = $client->teams->getTeamsForWorkspace($workspace->gid, ['limit' => 100]);
         }
+        $this->restTime();
         $teams = [];
         if (isset($res->pages->next_page)) {
             $teams = $this->getTeamProjects($workspace, $res->pages->next_page->offset);
