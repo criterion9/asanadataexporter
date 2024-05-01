@@ -75,15 +75,16 @@ class Export extends Command {
         $this->setName('asanadataexporter:export');
         $this->setDescription('Exports from Asana for a workspace, project, or other criteria and includes all tasks, sub-tasks, and comments');
         $this->addArgument('token', InputArgument::OPTIONAL, 'Your Asana Personal Access Token (PAT)');
-        $this->addArgument('output', InputArgument::OPTIONAL, 'Folder to output the exported date');
+        $this->addArgument('output', InputArgument::OPTIONAL, 'Folder to output the exported data');
         $this->addOption('outputsubfolder', null, InputOption::VALUE_OPTIONAL, 'Working directory folder to output the exported data');
-        $this->addOption('workspace', null, InputOption::VALUE_OPTIONAL, 'The workspace to export');
+        $this->addOption('workspace', null, InputOption::VALUE_OPTIONAL, 'The workspace to export, automatically selected if you only have access to 1 workspace.');
         $this->addOption('team', null, InputOption::VALUE_OPTIONAL, 'The team to export');
         $this->addOption('project', null, InputOption::VALUE_OPTIONAL, 'The project to export');
-        $this->addOption('include_subtasks', null, InputOption::VALUE_OPTIONAL, 'Whether to export subtasks, default is yes');
-        $this->addOption('include_attachments', null, InputOption::VALUE_OPTIONAL, 'Whether to export attachments, default is no');
-        $this->addOption('include_projectstatus', null, InputOption::VALUE_OPTIONAL, 'Whether to export project statuses, default is yes');
-        $this->addOption('compress_output', null, InputOption::VALUE_OPTIONAL, 'Whether to compress the output, default is yes');
+        $this->addOption('include_subtasks', null, InputOption::VALUE_OPTIONAL, 'Whether to export subtasks, default is true',true);
+        $this->addOption('include_attachments', null, InputOption::VALUE_OPTIONAL, 'Whether to export attachments, default is true',true);
+        $this->addOption('include_projectstatus', null, InputOption::VALUE_OPTIONAL, 'Whether to export project statuses, default is true',true);
+        $this->addOption('compress_output', null, InputOption::VALUE_OPTIONAL, 'Whether to compress the output, default is true',true);
+        $this->addOption('keep_raw_output', null, InputOption::VALUE_OPTIONAL,'Whether to keep the raw output or remove all working files after compression, default is false',false);
         $this->addOption('speed', null, InputOption::VALUE_OPTIONAL,'The speed [slow, normal, fast] to run the export requests, the default is normal', 'normal');
     }
 
@@ -119,9 +120,14 @@ MA 02110-1301  USA', null, null, '* ');
         if (empty($this->compressEnabled)) {
             $this->compressEnabled = $this->config['output']['compress'];
         }
+        $this->cleanAfterCompress = ($input->getOption('keep_raw_output'))?false:true;
         $speed = in_array($input->getOption('speed'),['slow','normal','fast'])?$input->getOption('speed'):'normal';
         $this->exporter->setSpeed($speed);
         $this->initialize = Command::SUCCESS;
+        ProgressBar::setFormatDefinition('minimal', '%percent%% %remaining%');
+        ProgressBar::setFormatDefinition('minimal_nomax', '%percent%%');
+        ProgressBar::setFormatDefinition('verbose_with_message',' %current% [%bar%] %percent:3s%% %elapsed:16s%/%estimated:-16s% %message%');
+        ProgressBar::setFormatDefinition('verbose_with_message_nomax',' %current% [%bar%] %percent:3s%% %elapsed:16s% %message%');
     }
 
     private function checkDirectory(InputInterface $input, SymfonyStyle $io): void {
@@ -336,15 +342,19 @@ MA 02110-1301  USA', null, null, '* ');
         $curProgress->finish();
         $io->newLine();
         $curProgress = $io->createProgressBar();
+        $curProgress->setFormat('verbose_with_message');
         $curProgress->start(3);
+        $curProgress->setMessage('Workspace');
         $io->newLine(2);
         $io->section('Workspace');
         $this->checkWorkspace($input, $io);
         $curProgress->advance();
+        $curProgress->setMessage('Team(s)');
         $io->newLine(2);
         $io->section('Team(s)');
         $this->checkTeam($input, $io);
         $curProgress->advance();
+        $curProgress->setMessage('Project(s)');
         $io->newLine(2);
         $io->section('Project(s)');
         $this->includeStatuses = $input->getOption('include_projectstatus');
@@ -353,6 +363,7 @@ MA 02110-1301  USA', null, null, '* ');
         }
         $this->checkProjects($input, $io);
         $curProgress->advance();
+        $curProgress->setMessage('complete');
         $this->includeSubtasks = $input->getOption('include_subtasks');
         if (empty($this->includeSubtasks)) {
             $this->includeSubtasks = $this->config['output']['include_subtasks'];
@@ -366,30 +377,41 @@ MA 02110-1301  USA', null, null, '* ');
 
     private function export(OutputInterface $output, SymfonyStyle $io): void {
         $this->currentSection->clear();
-        $projectsection = $output->section('Projects');
+        $projectsection = $output->section();
+        $projectsection->writeln('Projects:');
         $projectprogress = new ProgressBar($projectsection);
         $projectprogress->setOverwrite(true);
+        $projectprogress->setMaxSteps(count($this->project));
+        $projectprogress->setFormat('verbose_with_message');
+        $projectprogress->setMessage('');
+        $projectprogress->start();
         $tasksection = $output->section('Tasks');
+        $tasksection->writeln('Tasks:');
         $taskprogress = new ProgressBar($tasksection);
         $taskprogress->setOverwrite(true);
+        $taskprogress->setFormat('verbose_with_message_nomax');
+        $taskprogress->setMessage('');
         $taskprogress->start();
-        $attachmentsection = $output->section('Attachment');
+        $attachmentsection = $output->section('Attachments');
+        $attachmentsection->writeln('Attachments:');
         $attachmentprogress = new ProgressBar($attachmentsection);
         $attachmentprogress->setOverwrite(true);
+        $attachmentprogress->setFormat('verbose_with_message_nomax');
+        $attachmentprogress->setMessage('');
         $attachmentprogress->start();
         $basedir = $this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder;
-        $projectprogress->start(count($this->project));
         //$io->newLine();
         foreach ($this->project as $p) {
+            $projectprogress->setMessage($p->name);
             if (!isset($p->team)) {
                 $io->error('Team wasn\'t set for project: ' . $p->name);
+                $projectprogress->advance();
                 continue;
             }
             $projectdir = $basedir . DIRECTORY_SEPARATOR . urlencode($p->team->name) . DIRECTORY_SEPARATOR . urlencode($p->name);
             if (!is_dir($projectdir)) {
                 mkdir($projectdir, 0777, true);
             }
-            $io->getErrorStyle()->text('Starting project '.$p->name);
             $res = $this->exporter->exportProjectTasks($projectdir,
                     ['include_subtasks' => $this->includeSubtasks, 'projects' => [$p], 'progress' => $taskprogress]);
             sleep(1);
@@ -433,7 +455,7 @@ MA 02110-1301  USA', null, null, '* ');
         $io->newLine();
         return Command::SUCCESS;
     }
-
+    
     private function compressOutput($folder, SymfonyStyle $io) {
         $io->newLine(2);
         $io->title('Compression');
@@ -444,17 +466,16 @@ MA 02110-1301  USA', null, null, '* ');
             $this->exporter->compressOutput($folder, $this->outputFolder . DIRECTORY_SEPARATOR . 'export-' . $this->outputsubfolder . '.zip');
             $io->note('Output saved to ' . realpath($this->outputFolder) . DIRECTORY_SEPARATOR . 'export-' . $this->outputsubfolder . '.zip');
             if ($this->cleanAfterCompress) {
-                $files = new RecursiveIteratorIterator(
-                        new RecursiveDirectoryIterator($folder, RecursiveDirectoryIterator::SKIP_DOTS),
-                        RecursiveIteratorIterator::CHILD_FIRST
+                $files = new \RecursiveIteratorIterator(
+                        new \RecursiveDirectoryIterator($folder, \RecursiveDirectoryIterator::SKIP_DOTS),
+                        \RecursiveIteratorIterator::CHILD_FIRST
                 );
 
                 foreach ($files as $fileinfo) {
                     $todo = ($fileinfo->isDir() ? 'rmdir' : 'unlink');
                     $todo($fileinfo->getRealPath());
                 }
-
-                rmdir($dir);
+                rmdir($folder);
             }
         }
     }

@@ -58,6 +58,7 @@ use ZipArchive;
 class Exporter {
 
     const __SLOW = 1, __NORMAL = 3, __FAST = 5;
+
     private $access_token, $me;
     protected $config, $client, $attachments, $lastRest, $speed, $statusHeaders = [
                 'html_text', 'resource_type', 'resource_subtype', 'title', 'author', 'created_at', 'modified_at'
@@ -67,20 +68,20 @@ class Exporter {
         $this->config = $config;
         $this->speed = self::__NORMAL;
     }
-    
-    public function setSpeed($speed = self::__NORMAL){
-        if(in_array($speed, [self::__SLOW,self::__NORMAL, self::__FAST])){
+
+    public function setSpeed($speed = self::__NORMAL) {
+        if (in_array($speed, [self::__SLOW, self::__NORMAL, self::__FAST])) {
             $this->speed = $speed;
         }
     }
-    
+
     private function restTime() {
-        if(($this->lastRest - time()) >= 1*max(($this->speed/2),1)){
+        if (($this->lastRest - time()) >= 1 * max(($this->speed / 2), 1)) {
             $toRest = 1;
         } else {
-            $toRest = max(round(rand(0, (90/$this->speed)) / 100),0);
+            $toRest = max(round(rand(0, (90 / $this->speed)) / 100), 0);
         }
-        if($toRest){
+        if ($toRest) {
             sleep(1);
             $this->lastRest = time();
         }
@@ -143,9 +144,10 @@ class Exporter {
         foreach ($projects as $project) {
             $filter['project'] = $project->gid;
             if (isset($settings['progress'])) {
-                $settings['progress']->clear();
+                $settings['progress']->start();
             }
             foreach ($client->tasks->findAll($filter, ['page_size' => 100]) as $t) {
+                $settings['progress']->setMessage($t->name);
                 $this->restTime();
                 $result = $this->get_task($t->gid, $settings);
                 $tasks[is_object($result['task']) ? $result['task']->gid : $result['task']['gid']] = $result['task'];
@@ -213,6 +215,12 @@ class Exporter {
         usort($subtasks, function ($a, $b) {
             return ($a['created_at'] < $b['created_at']) ? -1 : 1;
         });
+        
+        $project = '';
+        
+        foreach($task_data->memberships as $p){
+            $project .= $p->project->name.': '.$p->section->name.', ';
+        }
 
         $res = ['status' => $status,
             'task' => [
@@ -220,11 +228,13 @@ class Exporter {
                 'assignee' => !empty($task_data->assignee->name) ? $task_data->assignee->name : 'null',
                 'created_at' => $task_data->created_at,
                 'completed_at' => $task_data->completed ? $this->format_timestamp($task_data->completed_at) : '',
+                'due_at' => $task_data->due_at,
                 'name' => $task_data->name,
                 'custom_fields' => $task_data->custom_fields,
                 'notes' => $task_data->notes,
                 'comments' => $comments,
-                'subtasks' => $subtasks
+                'subtasks' => $subtasks,
+                'project' => rtrim($project,', ')
         ]];
 
         $custom_fields = [];
@@ -250,9 +260,12 @@ class Exporter {
         $list = ($list != []) ? $list : (isset($this->attachments) ? $this->attachments : []);
         if ($list != []) {
             if (!is_null($progress)) {
-                $progress->clear();
+                $progress->start();
             }
             foreach ($list as $l) {
+                if (!is_null($progress)) {
+                    $progress->setMessage($l['text']);
+                }
                 if (!file_exists($attachment_directory . DIRECTORY_SEPARATOR . $l['text'])) {
                     $file = $l['url'];
                     if (function_exists('curl_version')) {
@@ -271,7 +284,9 @@ class Exporter {
                     }
                 }
                 $this->restTime();
-                $progress->advance();
+                if (!is_null($progress)) {
+                    $progress->advance();
+                }
             }
             if (!is_null($progress)) {
                 $progress->finish();
