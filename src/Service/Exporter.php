@@ -144,7 +144,7 @@ class Exporter {
         foreach ($projects as $project) {
             $filter['project'] = $project->gid;
             if (isset($settings['progress'])) {
-                $settings['progress']->start();
+                $settings['progress']->start(null,0);
             }
             foreach ($client->tasks->findAll($filter, ['page_size' => 100]) as $t) {
                 $settings['progress']->setMessage($t->name);
@@ -187,6 +187,7 @@ class Exporter {
             foreach ($client->attachments->getAttachmentsForObject(['parent' => $gid]) as $attachment) {
                 $this->restTime();
                 $attachment_data = $client->attachments->findById($attachment->gid);
+                $this->restTime();
                 $tmp = [
                     'created_at' => $attachment_data->created_at,
                     'text' => $attachment_data->name,
@@ -206,6 +207,7 @@ class Exporter {
             foreach ($client->tasks->getSubtasksForTask($gid) as $subtask) {
                 $this->restTime();
                 $result = $this->get_task($subtask->gid, $settings);
+                $this->restTime();
                 if ($result['status'] == 'OK') {
                     $subtasks[] = $result['task'];
                 }
@@ -260,7 +262,7 @@ class Exporter {
         $list = ($list != []) ? $list : (isset($this->attachments) ? $this->attachments : []);
         if ($list != []) {
             if (!is_null($progress)) {
-                $progress->start();
+                $progress->start(null,0);
             }
             foreach ($list as $l) {
                 if (!is_null($progress)) {
