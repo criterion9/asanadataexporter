@@ -403,6 +403,8 @@ MA 02110-1301  USA', null, null, '* ');
         //$io->newLine();
         foreach ($this->project as $p) {
             $projectprogress->setMessage($p->name);
+            $projectprogress->clear();
+            $projectprogress->display();
             if (!isset($p->team)) {
                 $io->error('Team wasn\'t set for project: ' . $p->name);
                 $projectprogress->advance();

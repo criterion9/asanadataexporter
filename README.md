@@ -31,7 +31,7 @@ composer install
 </li>
 <li>Setup Authentication
 
-Provide your personal access token (PAT):
+Provide your personal access token (PAT) using one of these options:
 <ol>
 <li>Save your personal access token to the first line in a new file here:  
 config/.asana_token .  </li>
