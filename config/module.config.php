@@ -45,7 +45,7 @@ $ret = [
             'include_csv' => true,
             'defaultlocation' => realpath(__DIR__).'/../asanaexport',
             'compress' => true,
-            'cleanaftercompress' => false,
+            'cleanaftercompress' => true,
             'adapter' => LocalFilesystem::class
         ],
         'token' => null

@@ -31,22 +31,53 @@ composer install
 </li>
 <li>Setup Authentication
 
-Save your personal access token to the first line in a new file: 
-'config/.asana_token'.  
-See [Personal access token](https://developers.asana.com/docs/personal-access-token) 
+Provide your personal access token (PAT):
+<ol>
+<li>Save your personal access token to the first line in a new file here:  
+config/.asana_token .  </li>
+<li>Use the optional parameter when running the commandline:  
+--token <PAT>  </li>
+<li>Provide your PAT when prompted when executing the commandline</li>
+</ol>
+See [Personal access token](https://developers.asana.com/docs/personal-access-token)
 for more details on how to generate your token.
 </li>
-<li>Run the console applications
+<li>Run the console application
 
 ````bash
 bin/console asanadataexporter:export
 ````
-
--- or (if execution will stay under 300 seconds) --
-
-````bash
-composer asanadataexport
-````
+Arguments & Parameters
+<dl>
+<dt><token></dt>
+<dd>Your Asana Personal Access Token (PAT)</dd>
+<dt><output></dt>
+<dd>Folder to output the exported data</dd>
+<dt>--outputsubfolder</dt>
+<dd>Working directory to output exported data. Defaults to the current timestamp.
+Use this option to continue an export that failed to complete.
+<dt>--workspace</dt>
+<dd>The workspace to export, automatically selected if you only have access to 
+1 workspace.</dd>
+<dt>--team</dt>
+<dd>The team to export</dd>
+<dt>--project</dt>
+<dd>The project to export</dd>
+<dt>--include_subtasks</dt>
+<dd>Whether to export subtasks, default is true</dd>
+<dt>--include_attachments</dt>
+<dd>Whether to export attachments, default is true</dd>
+<dt>--include_projectstatus</dt>
+<dd>Whether to export project statuses, default is true</dd>
+<dt>--compress_output</dt>
+<dd>Whether to compress the output, default is true</dd>
+<dt>--keep_raw_output</dt>
+<dd>Whether to keep the raw output or remove all working files after compression, 
+default is false</dd>
+<dt>--speed</dt>
+<dd>The speed (one of "slow", "normal", or "fast") to run the export requests, 
+the default is "normal"</dd>
+</dl>
 </li>
 
 ### <a name="mezzio" href="#mezzio">Mezzio</a>
@@ -77,5 +108,5 @@ There should be no additional steps beyond adding to your project's composer.jso
 
 ## <a name="usage" href="#usage">Usage</a>
 This package is built to support mezzio and laminas as well as be available as 
-a stand alone library include a command line option.
+a stand alone library including a command line option.
  
