@@ -122,6 +122,7 @@ MA 02110-1301  USA', null, null, '* ');
         }
         $this->cleanAfterCompress = ($input->getOption('keep_raw_output'))?false:true;
         $speed = in_array($input->getOption('speed'),['slow','normal','fast'])?$input->getOption('speed'):'normal';
+        $io->block('Speed mode: '.$speed);
         $this->exporter->setSpeed($speed);
         $this->initialize = Command::SUCCESS;
         ProgressBar::setFormatDefinition('minimal', '%percent%% %remaining%');
@@ -402,7 +403,7 @@ MA 02110-1301  USA', null, null, '* ');
         $basedir = $this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder;
         //$io->newLine();
         foreach ($this->project as $p) {
-            $projectprogress->setMessage($p->name);
+            $projectprogress->setMessage(substr($p->name,0,30));
             $projectprogress->clear();
             $projectprogress->display();
             if (!isset($p->team)) {
