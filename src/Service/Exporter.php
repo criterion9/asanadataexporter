@@ -67,6 +67,7 @@ class Exporter {
     public function __construct($config = []) {
         $this->config = $config;
         $this->speed = self::__NORMAL;
+        $this->lastRest = time();
     }
 
     public function setSpeed($speed = self::__NORMAL) {
@@ -76,15 +77,19 @@ class Exporter {
     }
 
     private function restTime() {
-        if (($this->lastRest - time()) >= 1 * max(($this->speed / 2), 1)) {
+        if (($this->lastRest - time()) >= .75 * ($this->speed / 2)) {
             $toRest = 1;
         } else {
-            $toRest = max(round(rand(0, (90 / $this->speed)) / 100), 0);
+            $toRest = max(round(rand(0, (150 / $this->speed)) / 100), 0);
         }
         if ($toRest) {
-            sleep(1);
+            sleep(rand(4, 7));
             $this->lastRest = time();
         }
+        if ($this->speed == self::__SLOW) {
+            sleep(2);
+        }
+        usleep(rand(15000, 25000) / 100);
     }
 
     public function setToken(string $token): void {
@@ -144,7 +149,7 @@ class Exporter {
         foreach ($projects as $project) {
             $filter['project'] = $project->gid;
             if (isset($settings['progress'])) {
-                $settings['progress']->start(null,0);
+                $settings['progress']->start(null, 0);
             }
             foreach ($client->tasks->findAll($filter, ['page_size' => 100]) as $t) {
                 $settings['progress']->setMessage($t->name);
@@ -217,11 +222,11 @@ class Exporter {
         usort($subtasks, function ($a, $b) {
             return ($a['created_at'] < $b['created_at']) ? -1 : 1;
         });
-        
+
         $project = '';
-        
-        foreach($task_data->memberships as $p){
-            $project .= $p->project->name.': '.$p->section->name.', ';
+
+        foreach ($task_data->memberships as $p) {
+            $project .= $p->project->name . ': ' . $p->section->name . ', ';
         }
 
         $res = ['status' => $status,
@@ -232,16 +237,17 @@ class Exporter {
                 'completed_at' => $task_data->completed ? $this->format_timestamp($task_data->completed_at) : '',
                 'due_at' => $task_data->due_at,
                 'name' => $task_data->name,
-                'custom_fields' => $task_data->custom_fields,
+                'custom_fields' => isset($task_data->custom_fields)?$task_data->custom_fields:[],
                 'notes' => $task_data->notes,
                 'comments' => $comments,
                 'subtasks' => $subtasks,
-                'project' => rtrim($project,', ')
+                'project' => rtrim($project, ', ')
         ]];
 
-        $custom_fields = [];
-        foreach ($task_data->custom_fields as $custField) {
-            $res['task'][$custField->name] = $custField->display_value;
+        if (isset($task_data->custom_fields)) {
+            foreach ($task_data->custom_fields as $custField) {
+                $res['task'][$custField->name] = $custField->display_value;
+            }
         }
 
         return $res;
@@ -262,7 +268,7 @@ class Exporter {
         $list = ($list != []) ? $list : (isset($this->attachments) ? $this->attachments : []);
         if ($list != []) {
             if (!is_null($progress)) {
-                $progress->start(null,0);
+                $progress->start(null, 0);
             }
             foreach ($list as $l) {
                 if (!is_null($progress)) {
