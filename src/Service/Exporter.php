@@ -36,6 +36,7 @@
 namespace Criterion9\AsanaDataExporter\Service;
 
 use Asana\Client;
+use Criterion9\AsanaDataExporter\Storage\SQLite;
 use Exception;
 use IteratorIterator;
 use RecursiveDirectoryIterator;
@@ -59,7 +60,7 @@ class Exporter {
 
     const __SLOW = 1, __NORMAL = 3, __FAST = 5;
 
-    private $access_token, $me;
+    private $access_token, $me, $session, $workingdirectory;
     protected $config, $client, $attachments, $lastRest, $speed, $statusHeaders = [
                 'html_text', 'resource_type', 'resource_subtype', 'title', 'author', 'created_at', 'modified_at'
     ];
@@ -68,6 +69,36 @@ class Exporter {
         $this->config = $config;
         $this->speed = self::__NORMAL;
         $this->lastRest = time();
+        if ($this->config['useLocalSession'] == false) {
+            $this->session = false;
+        }
+    }
+
+    public function __destruct() {
+        $session = $this->getLocalSession();
+        if ($session) {
+            $session->close();
+        }
+    }
+
+    public function clearDB() {
+        $session = $this->getLocalSession();
+        if ($session) {
+            $session->clearDB();
+        }
+    }
+
+    private function getLocalSession(string $workingdirectory = '') {
+        if (!empty($workingdirectory) && empty($this->workingdirectory)) {
+            $this->workingdirectory = $workingdirectory . DIRECTORY_SEPARATOR . '../';
+        }
+        if (!empty($this->workingdirectory) && $this->session !== false) {
+            if ($this->config['useLocalSession']) {
+                $this->session = new SQLite($this->workingdirectory);
+            }
+            return $this->session;
+        }
+        return false;
     }
 
     public function setSpeed($speed = self::__NORMAL) {
@@ -105,7 +136,7 @@ class Exporter {
         if (!is_writable($working_directory)) {
             throw new Exception('Working directory is not writable.');
         }
-
+        $this->workingdirectory = $working_directory . DIRECTORY_SEPARATOR . '../';
         $projects = isset($settings['projects']) ? $settings['projects'] : false;
         $teams = isset($settings['teams']) ? $settings['teams'] : false;
         $workspace = isset($settings['workspace']) ? $settings['workspace'] : false;
@@ -131,6 +162,7 @@ class Exporter {
         if (!is_writable($working_directory)) {
             throw new Exception('Working directory is not writable.');
         }
+        $this->workingdirectory = $working_directory . DIRECTORY_SEPARATOR . '../';
         $projects = isset($settings['projects']) ? $settings['projects'] : false;
         if (!$projects) {
             throw new Exception('Must provide an array of project(s).');
@@ -172,7 +204,14 @@ class Exporter {
         $status = "OK";
         $comments = [];
         $subtasks = [];
-
+        $session = $this->getLocalSession();
+        if ($session) {
+            $res = $session->getTask($gid);
+            if ($res) {
+                return ['status' => $status,
+                    'task' => $res];
+            }
+        }
         $client = $this->getClient();
         $task_data = $client->tasks->getTask($gid);
         $this->restTime();
@@ -237,7 +276,7 @@ class Exporter {
                 'completed_at' => $task_data->completed ? $this->format_timestamp($task_data->completed_at) : '',
                 'due_at' => $task_data->due_at,
                 'name' => $task_data->name,
-                'custom_fields' => isset($task_data->custom_fields)?$task_data->custom_fields:[],
+                'custom_fields' => isset($task_data->custom_fields) ? $task_data->custom_fields : [],
                 'notes' => $task_data->notes,
                 'comments' => $comments,
                 'subtasks' => $subtasks,
@@ -250,6 +289,9 @@ class Exporter {
             }
         }
 
+        if ($session) {
+            $session->saveTask($res['task']);
+        }
         return $res;
     }
 
@@ -259,6 +301,7 @@ class Exporter {
 
     public function fetchAttachments(string $working_directory, array $list = [], $progress = null) {
         $attachment_directory = $working_directory . DIRECTORY_SEPARATOR . 'attachments';
+        $this->workingdirectory = $working_directory;
         if (!is_dir($attachment_directory)) {
             mkdir($attachment_directory);
         }
@@ -309,6 +352,7 @@ class Exporter {
         if (!is_writable($working_directory)) {
             throw new Exception('Working directory is not writable.');
         }
+        $this->workingdirectory = $working_directory;
         $include_json = isset($settings['include_json']) ? $settings['include_json'] : $this->config['output']['include_json'];
         if ($include_json) {
             $this->writeTaskJson($working_directory, $tasks);
@@ -320,6 +364,7 @@ class Exporter {
     }
 
     private function writeTaskJson(string $working_directory, array $tasks) {
+        $this->workingdirectory = $working_directory;
         file_put_contents($working_directory . DIRECTORY_SEPARATOR . 'tasks.json', json_encode($tasks));
     }
 
@@ -353,6 +398,7 @@ class Exporter {
             }
         }
         fclose($fh);
+        $this->workingdirectory = $working_directory;
     }
 
     public function writeProject(string $working_directory, \stdClass $project, array $project_statuses = [], array $settings = ['compress_output' => false, 'include_json' => true, 'include_csv' => true]) {
@@ -362,6 +408,7 @@ class Exporter {
         if (!is_writable($working_directory)) {
             throw new Exception('Working directory is not writable.');
         }
+        $this->workingdirectory = $working_directory;
         $include_json = isset($settings['include_json']) ? $settings['include_json'] : $this->config['output']['include_json'];
         if ($include_json) {
             $this->writeProjectJson($working_directory, $project);
