@@ -456,6 +456,7 @@ MA 02110-1301  USA', null, null, '* ');
         $io->newLine();
         $this->compressOutput($this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder, $io);
         $io->newLine();
+        $this->exporter->clearDB();
         return Command::SUCCESS;
     }
     

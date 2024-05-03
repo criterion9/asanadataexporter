@@ -6,7 +6,7 @@
  * PHP version 8
  * 
  * * * License * * * 
- * Copyright (C) 2024 Andrew Wallace <andrew.wallace@portospire.com>.
+ * Copyright (C) 2024 Andrew Wallace <criterion9@proton.me>.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,8 +26,8 @@
  * 
  * @category  CategoryName
  * @package   PackageName
- * @author    Andrew Wallace <andrew.wallace@portospire.com>
- * @copyright 2024 Andrew Wallace <andrew.wallace@portospire.com>
+ * @author    Andrew Wallace <criterion9@proton.me>
+ * @copyright 2024 Andrew Wallace <criterion9@proton.me>
  * @license   LGPL21
  * @version   GIT: $ID$
  * @link      
@@ -35,19 +35,17 @@
 
 namespace Criterion9\AsanaDataExporter\Storage\Adapter;
 
-use Laminas\ServiceManager\Factory\AbstractFactoryInterface,
-    \PortoSpireCMS\Storage\LocalFilesystem,
-    PortoSpireConfig\Service\ConfigurationManager,
-    PortoSpireConfig\Service\SiteManager;
+use Laminas\ServiceManager\Factory\AbstractFactoryInterface;
 use Laminas\Stdlib\ArrayUtils;
+
 
 /**
  * Description of LocalFilesystemFactory
  *
  * @category  CategoryName
  * @package   PackageName
- * @author    Andrew Wallace <andrew.wallace@portospire.com>
- * @copyright 2024 Andrew Wallace <andrew.wallace@portospire.com>
+ * @author    Andrew Wallace <criterion9@proton.me>
+ * @copyright 2024 Andrew Wallace <criterion9@proton.me>
  * @license   LGPL21
  * @version   Release: @package_version@
  * @link      
@@ -68,16 +66,7 @@ class LocalFilesystemFactory implements AbstractFactoryInterface {
             $requestedName, array $options = null
     ): mixed {
 
-        $config = [];
-        $config1 = $container->get('config');
-        if (isset($config1['ImageManager']['storage'])) {
-            $config = $config1['ImageManager']['storage'];
-        }
-        $configManager = $container->get(ConfigurationManager::class);
-        $siteArr = $configManager->buildArray(0, $container->get(SiteManager::class)->getAdminSiteID());
-        if (isset($siteArr['root']['ImageManager']['storage'])) {
-            $config = ArrayUtils::merge($config, $siteArr['root']['ImageManager']['storage']);
-        }
+        $config = $container->get('config');
         return new LocalFilesystem($config);
     }
 

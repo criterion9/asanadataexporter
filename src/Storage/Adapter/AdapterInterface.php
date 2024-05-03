@@ -6,7 +6,7 @@
  * PHP version 8
  * 
  * * * License * * * 
- * Copyright (C) 2024 Andrew Wallace <andrew.wallace@portospire.com>.
+ * Copyright (C) 2024 Andrew Wallace <criterion9@proton.me>.
  * 
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,8 +26,8 @@
  * 
  * @category  CategoryName
  * @package   PackageName
- * @author    Andrew Wallace <andrew.wallace@portospire.com>
- * @copyright 2024 Andrew Wallace <andrew.wallace@portospire.com>
+ * @author    Andrew Wallace <criterion9@proton.me>
+ * @copyright 2024 Andrew Wallace <criterion9@proton.me>
  * @license   LGPL21
  * @version   GIT: $ID$
  * @link      
@@ -40,8 +40,8 @@ namespace Criterion9\AsanaDataExporter\Storage\Adapter;
  *
  * @category  CategoryName
  * @package   PackageName
- * @author    Andrew Wallace <andrew.wallace@portospire.com>
- * @copyright 2024 Andrew Wallace <andrew.wallace@portospire.com>
+ * @author    Andrew Wallace <criterion9@proton.me>
+ * @copyright 2024 Andrew Wallace <criterion9@proton.me>
  * @license   LGPL21
  * @version   Release: @package_version@
  * @link      

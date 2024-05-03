@@ -25,6 +25,7 @@
     "require": {
         "php": "^8.0 || ^8.1 || ^8.2",
         "ext-zip": "*",
+        "ext-sqlite3": "*",
         "asana/asana": ">=v1.0.6",
         "symfony/console": ">=v7.0.6",
         "laminas/laminas-servicemanager": ">=4.1.0",

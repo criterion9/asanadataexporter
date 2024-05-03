@@ -48,6 +48,7 @@ $ret = [
             'cleanaftercompress' => true,
             'adapter' => LocalFilesystem::class
         ],
+        'useLocalSession' => true,
         'token' => null
     ]
 ];
