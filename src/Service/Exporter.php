@@ -262,7 +262,9 @@ class Exporter {
         }
 
         usort($subtasks, function ($a, $b) {
-            return ($a['created_at'] < $b['created_at']) ? -1 : 1;
+            $asort = is_array($a)?$a['created_at']:$a->created_at;
+            $bsort = is_array($b)?$b['created_at']:$b->created_at;
+            return ($asort < $bsort) ? -1 : 1;
         });
 
         $project = '';
