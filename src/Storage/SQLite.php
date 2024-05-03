@@ -86,7 +86,7 @@ class SQLite extends \SQLite3 {
         //$this->query('INSERT INTO tasks (gid, obj) VALUES (\'' . $this->escapeString($task['gid']) . '\', "' . json_encode($task) . '\')');
     }
 
-    public function getTask(string $gid): array|bool {
+    public function getTask(string $gid): array|\stdClass|bool {
         if (!empty($gid)) {
             $res = $this->querySingle('SELECT gid, obj FROM tasks WHERE gid=\'' . $this->escapeString($gid) . '\'', true);
             if ($res) {

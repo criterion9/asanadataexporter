@@ -89,6 +89,9 @@ class Exporter {
     }
 
     private function getLocalSession(string $workingdirectory = '') {
+        if($this->session){
+            return $this->session;
+        }
         if (!empty($workingdirectory) && empty($this->workingdirectory)) {
             $this->workingdirectory = $workingdirectory . DIRECTORY_SEPARATOR . '../';
         }
@@ -391,6 +394,12 @@ class Exporter {
                 $tmp = [];
                 foreach ($headers as $header) {
                     $tmp[$header] = isset($row[$header]) ? $row[$header] : '';
+                }
+                fputcsv($fh, $tmp);
+            } elseif (is_object($row) && $row instanceof \stdClass) {
+                $tmp = [];
+                foreach ($headers as $header) {
+                    $tmp[$header] = isset($row->$header) ? $row->$header : '';
                 }
                 fputcsv($fh, $tmp);
             } else {
