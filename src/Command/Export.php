@@ -125,10 +125,10 @@ MA 02110-1301  USA', null, null, '* ');
         $io->block('Speed mode: '.$speed);
         $this->exporter->setSpeed($speed);
         $this->initialize = Command::SUCCESS;
-        ProgressBar::setFormatDefinition('minimal', '%percent%% %remaining%');
-        ProgressBar::setFormatDefinition('minimal_nomax', '%percent%%');
-        ProgressBar::setFormatDefinition('verbose_with_message',' %current% [%bar%] %percent:3s%% %elapsed:16s%/%estimated:-16s% %message%');
-        ProgressBar::setFormatDefinition('verbose_with_message_nomax',' %current% [%bar%] %percent:3s%% %elapsed:16s% %message%');
+        ProgressBar::setFormatDefinition('minimal', '%percent:3s%% %remaining%');
+        ProgressBar::setFormatDefinition('minimal_nomax', '%current:4s%');
+        ProgressBar::setFormatDefinition('verbose_with_message',' %current:4s% [%bar%] %percent:3s%% %elapsed:16s%/%estimated:-16s% %message%');
+        ProgressBar::setFormatDefinition('verbose_with_message_nomax',' %current:4s% [%bar%] %elapsed:16s% %message%');
     }
 
     private function checkDirectory(InputInterface $input, SymfonyStyle $io): void {
@@ -401,10 +401,8 @@ MA 02110-1301  USA', null, null, '* ');
         $attachmentprogress->setMessage('');
         $attachmentprogress->start();
         $basedir = $this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder;
-        //$io->newLine();
         foreach ($this->project as $p) {
             $projectprogress->setMessage(substr($p->name,0,30));
-            $projectprogress->clear();
             $projectprogress->display();
             if (!isset($p->team)) {
                 $io->error('Team wasn\'t set for project: ' . $p->name);
@@ -417,20 +415,24 @@ MA 02110-1301  USA', null, null, '* ');
             }
             $res = $this->exporter->exportProjectTasks($projectdir,
                     ['include_subtasks' => $this->includeSubtasks, 'projects' => [$p], 'progress' => $taskprogress]);
+            $projectprogress->display();
             sleep(1);
             if ($this->includeAttachments) {
                 if (!is_dir($projectdir . DIRECTORY_SEPARATOR . 'attachments')) {
                     mkdir($projectdir . DIRECTORY_SEPARATOR . 'attachments', 0777, true);
                 }
                 $this->exporter->fetchAttachments($projectdir, [], $attachmentprogress, ['progress' => $attachmentprogress]);
+                $projectprogress->display();
                 sleep(1);
             }
             $this->exporter->writeProject($projectdir, $p, isset($p->status) ? $p->status : []);
             $this->exporter->clearAttachmentCache();
             $projectprogress->advance();
-            //sleep(max(round(rand(0, 85) / 100),0));
+            $projectprogress->display();
+            sleep(1);
         }
         $projectprogress->finish();
+        $projectprogress->display();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
@@ -452,11 +454,11 @@ MA 02110-1301  USA', null, null, '* ');
         $io->newLine(2);
         $io->title('Export');
         $io->info('This may take awhile depending upon the number of items to export');
+        $io->newLine();
         $this->export($output, $io);
         $io->newLine();
         $this->compressOutput($this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder, $io);
         $io->newLine();
-        $this->exporter->clearDB();
         return Command::SUCCESS;
     }
     
@@ -467,6 +469,7 @@ MA 02110-1301  USA', null, null, '* ');
             $io->getErrorStyle()->info('Compression disabled');
             $io->note('Output saved to ' . $folder);
         } else {
+            $this->exporter->clearDB();
             $this->exporter->compressOutput($folder, $this->outputFolder . DIRECTORY_SEPARATOR . 'export-' . $this->outputsubfolder . '.zip');
             $io->note('Output saved to ' . realpath($this->outputFolder) . DIRECTORY_SEPARATOR . 'export-' . $this->outputsubfolder . '.zip');
             if ($this->cleanAfterCompress) {

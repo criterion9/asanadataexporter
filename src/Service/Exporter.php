@@ -188,15 +188,18 @@ class Exporter {
             }
             foreach ($client->tasks->findAll($filter, ['page_size' => 100]) as $t) {
                 $settings['progress']->setMessage($t->name);
+                $settings['progress']->display();
                 $this->restTime();
                 $result = $this->get_task($t->gid, $settings);
                 $tasks[is_object($result['task']) ? $result['task']->gid : $result['task']['gid']] = $result['task'];
                 if (isset($settings['progress'])) {
                     $settings['progress']->advance();
+                    $settings['progress']->display();
                 }
             }
             if (isset($settings['progress'])) {
                 $settings['progress']->finish();
+                $settings['progress']->display();
             }
         }
         $this->writeTasks($working_directory, $tasks, $settings);
@@ -262,9 +265,7 @@ class Exporter {
         }
 
         usort($subtasks, function ($a, $b) {
-            $asort = is_array($a)?$a['created_at']:$a->created_at;
-            $bsort = is_array($b)?$b['created_at']:$b->created_at;
-            return ($asort < $bsort) ? -1 : 1;
+            return ($a['created_at'] < $b['created_at']) ? -1 : 1;
         });
 
         $project = '';
