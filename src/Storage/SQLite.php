@@ -83,25 +83,15 @@ class SQLite extends \SQLite3 {
         $stmt->bindValue(1, $task['gid']);
         $stmt->bindValue(2, json_encode($task));
         $stmt->execute();
+        //$this->query('INSERT INTO tasks (gid, obj) VALUES (\'' . $this->escapeString($task['gid']) . '\', "' . json_encode($task) . '\')');
     }
 
-    public function getTask(string $gid): array|bool {
+    public function getTask(string $gid): array|\stdClass|bool {
         if (!empty($gid)) {
             $res = $this->querySingle('SELECT gid, obj FROM tasks WHERE gid=\'' . $this->escapeString($gid) . '\'', true);
             if ($res) {
-                $decoded = json_decode($res['obj']);
-                if (is_object($res) && $res instanceof \stdClass) {
-                    $tmp = [];
-                    $attributes = get_object_vars($decoded);
-                    foreach ($attributes as $a) {
-                        if (isset($decoded->$a)) {
-                            $tmp[$a] = $decoded->$a;
-                        }
-                    }
-                    return $tmp;
-                }
+                return json_decode($res['obj'],true);
             }
-            return $res;
         }
         return false;
     }

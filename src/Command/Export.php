@@ -63,7 +63,7 @@ class Export extends Command {
     protected $exporter, $config, $initialize, $interact;
     protected $workspace, $team, $project, $outputFolder, $outputsubfolder;
     protected $includeSubtasks, $includeAttachments, $compressEnabled, $currentSection,
-            $cleanAfterCompress, $includeStatuses;
+            $cleanAfterCompress, $includeStatuses, $keepCache;
 
     public function __construct(Exporter $exporter, $config) {
         $this->exporter = $exporter;
@@ -80,12 +80,13 @@ class Export extends Command {
         $this->addOption('workspace', null, InputOption::VALUE_OPTIONAL, 'The workspace to export, automatically selected if you only have access to 1 workspace.');
         $this->addOption('team', null, InputOption::VALUE_OPTIONAL, 'The team to export');
         $this->addOption('project', null, InputOption::VALUE_OPTIONAL, 'The project to export');
-        $this->addOption('include_subtasks', null, InputOption::VALUE_OPTIONAL, 'Whether to export subtasks, default is true',true);
-        $this->addOption('include_attachments', null, InputOption::VALUE_OPTIONAL, 'Whether to export attachments, default is true',true);
-        $this->addOption('include_projectstatus', null, InputOption::VALUE_OPTIONAL, 'Whether to export project statuses, default is true',true);
-        $this->addOption('compress_output', null, InputOption::VALUE_OPTIONAL, 'Whether to compress the output, default is true',true);
-        $this->addOption('keep_raw_output', null, InputOption::VALUE_OPTIONAL,'Whether to keep the raw output or remove all working files after compression, default is false',false);
-        $this->addOption('speed', null, InputOption::VALUE_OPTIONAL,'The speed [slow, normal, fast] to run the export requests, the default is normal', 'normal');
+        $this->addOption('include_subtasks', null, InputOption::VALUE_OPTIONAL, 'Whether to export subtasks, default is true', true);
+        $this->addOption('include_attachments', null, InputOption::VALUE_OPTIONAL, 'Whether to export attachments, default is true', true);
+        $this->addOption('include_projectstatus', null, InputOption::VALUE_OPTIONAL, 'Whether to export project statuses, default is true', true);
+        $this->addOption('compress_output', null, InputOption::VALUE_OPTIONAL, 'Whether to compress the output, default is true', true);
+        $this->addOption('keep_raw_output', null, InputOption::VALUE_OPTIONAL, 'Whether to keep the raw output or remove all working files after compression, default is false', false);
+        $this->addOption('keep_local_cache', null, InputOption::VALUE_OPTIONAL, 'Whether to keep the local cache or remove it prior to compression, default is false', false);
+        $this->addOption('speed', null, InputOption::VALUE_OPTIONAL, 'The speed [slow, normal, fast] to run the export requests, the default is normal', 'normal');
     }
 
     protected function initialize(InputInterface $input, OutputInterface $output): void {
@@ -120,15 +121,16 @@ MA 02110-1301  USA', null, null, '* ');
         if (empty($this->compressEnabled)) {
             $this->compressEnabled = $this->config['output']['compress'];
         }
-        $this->cleanAfterCompress = ($input->getOption('keep_raw_output'))?false:true;
-        $speed = in_array($input->getOption('speed'),['slow','normal','fast'])?$input->getOption('speed'):'normal';
-        $io->block('Speed mode: '.$speed);
+        $this->cleanAfterCompress = ($input->getOption('keep_raw_output')) ? false : true;
+        $this->keepCache = ($input->getOption('keep_local_cache')) ? true : false;
+        $speed = in_array($input->getOption('speed'), ['slow', 'normal', 'fast']) ? $input->getOption('speed') : 'normal';
+        $io->block('Speed mode: ' . $speed);
         $this->exporter->setSpeed($speed);
         $this->initialize = Command::SUCCESS;
-        ProgressBar::setFormatDefinition('minimal', '%percent:3s%% %remaining%');
-        ProgressBar::setFormatDefinition('minimal_nomax', '%current:4s%');
-        ProgressBar::setFormatDefinition('verbose_with_message',' %current:4s% [%bar%] %percent:3s%% %elapsed:16s%/%estimated:-16s% %message%');
-        ProgressBar::setFormatDefinition('verbose_with_message_nomax',' %current:4s% [%bar%] %elapsed:16s% %message%');
+        ProgressBar::setFormatDefinition('minimal', '%percent%% %remaining%');
+        ProgressBar::setFormatDefinition('minimal_nomax', '%percent%%');
+        ProgressBar::setFormatDefinition('verbose_with_message', ' %current% [%bar%] %percent:3s%% %elapsed:16s%/%estimated:-16s% %message%');
+        ProgressBar::setFormatDefinition('verbose_with_message_nomax', ' %current% [%bar%] %elapsed:16s% %message%');
     }
 
     private function checkDirectory(InputInterface $input, SymfonyStyle $io): void {
@@ -298,7 +300,6 @@ MA 02110-1301  USA', null, null, '* ');
                         $tmp[] = $row;
                     }
                 }
-                
             }
             if ($tmp == [] && count($this->project)) {
                 $io->getErrorStyle()->error('Unable to locate your project. Check the name and try again or omit passing the workspace to get a list to choose from.');
@@ -401,8 +402,10 @@ MA 02110-1301  USA', null, null, '* ');
         $attachmentprogress->setMessage('');
         $attachmentprogress->start();
         $basedir = $this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder;
+        //$io->newLine();
         foreach ($this->project as $p) {
-            $projectprogress->setMessage(substr($p->name,0,30));
+            $projectprogress->setMessage(substr($p->name, 0, 30));
+            $projectprogress->clear();
             $projectprogress->display();
             if (!isset($p->team)) {
                 $io->error('Team wasn\'t set for project: ' . $p->name);
@@ -415,24 +418,20 @@ MA 02110-1301  USA', null, null, '* ');
             }
             $res = $this->exporter->exportProjectTasks($projectdir,
                     ['include_subtasks' => $this->includeSubtasks, 'projects' => [$p], 'progress' => $taskprogress]);
-            $projectprogress->display();
             sleep(1);
             if ($this->includeAttachments) {
                 if (!is_dir($projectdir . DIRECTORY_SEPARATOR . 'attachments')) {
                     mkdir($projectdir . DIRECTORY_SEPARATOR . 'attachments', 0777, true);
                 }
                 $this->exporter->fetchAttachments($projectdir, [], $attachmentprogress, ['progress' => $attachmentprogress]);
-                $projectprogress->display();
                 sleep(1);
             }
             $this->exporter->writeProject($projectdir, $p, isset($p->status) ? $p->status : []);
             $this->exporter->clearAttachmentCache();
             $projectprogress->advance();
-            $projectprogress->display();
-            sleep(1);
+            //sleep(max(round(rand(0, 85) / 100),0));
         }
         $projectprogress->finish();
-        $projectprogress->display();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
@@ -454,14 +453,16 @@ MA 02110-1301  USA', null, null, '* ');
         $io->newLine(2);
         $io->title('Export');
         $io->info('This may take awhile depending upon the number of items to export');
-        $io->newLine();
         $this->export($output, $io);
         $io->newLine();
         $this->compressOutput($this->outputFolder . DIRECTORY_SEPARATOR . $this->outputsubfolder, $io);
         $io->newLine();
+        if (!$this->keepCache) {
+            $this->exporter->clearDB();
+        }
         return Command::SUCCESS;
     }
-    
+
     private function compressOutput($folder, SymfonyStyle $io) {
         $io->newLine(2);
         $io->title('Compression');
@@ -469,7 +470,6 @@ MA 02110-1301  USA', null, null, '* ');
             $io->getErrorStyle()->info('Compression disabled');
             $io->note('Output saved to ' . $folder);
         } else {
-            $this->exporter->clearDB();
             $this->exporter->compressOutput($folder, $this->outputFolder . DIRECTORY_SEPARATOR . 'export-' . $this->outputsubfolder . '.zip');
             $io->note('Output saved to ' . realpath($this->outputFolder) . DIRECTORY_SEPARATOR . 'export-' . $this->outputsubfolder . '.zip');
             if ($this->cleanAfterCompress) {
