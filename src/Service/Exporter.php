@@ -60,7 +60,7 @@ class Exporter {
 
     const __SLOW = 1, __NORMAL = 3, __FAST = 5;
 
-    private $access_token, $me, $session, $workingdirectory;
+    private $access_token, $me, $session, $workingdirectory, $requested;
     protected $config, $client, $attachments, $lastRest, $speed, $statusHeaders = [
                 'html_text', 'resource_type', 'resource_subtype', 'title', 'author', 'created_at', 'modified_at'
     ];
@@ -69,6 +69,7 @@ class Exporter {
         $this->config = $config;
         $this->speed = self::__NORMAL;
         $this->lastRest = time();
+        $this->requested = false;
         if ($this->config['useLocalSession'] == false) {
             $this->session = false;
         }
@@ -89,7 +90,7 @@ class Exporter {
     }
 
     private function getLocalSession(string $workingdirectory = '') {
-        if($this->session){
+        if ($this->session) {
             return $this->session;
         }
         if (!empty($workingdirectory) && empty($this->workingdirectory)) {
@@ -111,19 +112,22 @@ class Exporter {
     }
 
     private function restTime() {
-        if (($this->lastRest - time()) >= .75 * ($this->speed / 2)) {
-            $toRest = 1;
-        } else {
-            $toRest = max(round(rand(0, (150 / $this->speed)) / 100), 0);
+        if ($this->requested) {
+            if (($this->lastRest - time()) >= .75 * ($this->speed / 2)) {
+                $toRest = 1;
+            } else {
+                $toRest = max(round(rand(0, (150 / $this->speed)) / 100), 0);
+            }
+            if ($toRest) {
+                sleep(rand(4, 7));
+                $this->lastRest = time();
+                $this->requested = false;
+            }
+            if ($this->speed == self::__SLOW) {
+                sleep(1);
+            }
+            usleep(rand(15000, 25000) / 100);
         }
-        if ($toRest) {
-            sleep(rand(4, 7));
-            $this->lastRest = time();
-        }
-        if ($this->speed == self::__SLOW) {
-            sleep(2);
-        }
-        usleep(rand(15000, 25000) / 100);
     }
 
     public function setToken(string $token): void {
@@ -188,18 +192,16 @@ class Exporter {
             }
             foreach ($client->tasks->findAll($filter, ['page_size' => 100]) as $t) {
                 $settings['progress']->setMessage($t->name);
-                $settings['progress']->display();
+                $this->requested = true;
                 $this->restTime();
                 $result = $this->get_task($t->gid, $settings);
                 $tasks[is_object($result['task']) ? $result['task']->gid : $result['task']['gid']] = $result['task'];
                 if (isset($settings['progress'])) {
                     $settings['progress']->advance();
-                    $settings['progress']->display();
                 }
             }
             if (isset($settings['progress'])) {
                 $settings['progress']->finish();
-                $settings['progress']->display();
             }
         }
         $this->writeTasks($working_directory, $tasks, $settings);
@@ -220,10 +222,12 @@ class Exporter {
         }
         $client = $this->getClient();
         $task_data = $client->tasks->getTask($gid);
+        $this->requested = true;
         $this->restTime();
         $include_subtasks = isset($settings['include_subtasks']) ? $settings['include_subtasks'] : $this->config['output']['include_subtasks'];
         $include_attachments = isset($settings['include_attachments']) ? $settings['include_attachments'] : $this->config['output']['include_attachments'];
         foreach ($client->stories->getStoriesForTask($gid) as $story) {
+            $this->requested = true;
             $this->restTime();
             if ($story->type == 'comment') {
                 $comments[] = [
@@ -235,8 +239,10 @@ class Exporter {
 
         if ($include_attachments) {
             foreach ($client->attachments->getAttachmentsForObject(['parent' => $gid]) as $attachment) {
+                $this->requested = true;
                 $this->restTime();
                 $attachment_data = $client->attachments->findById($attachment->gid);
+                $this->requested = true;
                 $this->restTime();
                 $tmp = [
                     'created_at' => $attachment_data->created_at,
@@ -255,8 +261,10 @@ class Exporter {
         });
         if ($include_subtasks) {
             foreach ($client->tasks->getSubtasksForTask($gid) as $subtask) {
+                $this->requested = true;
                 $this->restTime();
                 $result = $this->get_task($subtask->gid, $settings);
+                $this->requested = true;
                 $this->restTime();
                 if ($result['status'] == 'OK') {
                     $subtasks[] = $result['task'];
@@ -265,7 +273,9 @@ class Exporter {
         }
 
         usort($subtasks, function ($a, $b) {
-            return ($a['created_at'] < $b['created_at']) ? -1 : 1;
+            $asort = is_array($a) ? $a['created_at'] : $a->created_at;
+            $bsort = is_array($b) ? $b['created_at'] : $b->created_at;
+            return ($asort < $bsort) ? -1 : 1;
         });
 
         $project = '';
@@ -281,6 +291,9 @@ class Exporter {
                 'created_at' => $task_data->created_at,
                 'completed_at' => $task_data->completed ? $this->format_timestamp($task_data->completed_at) : '',
                 'due_at' => $task_data->due_at,
+                'due_on' => $task_data->due_on,
+                'start_at' => $task_data->start_at,
+                'start_on' => $task_data->start_on,
                 'name' => $task_data->name,
                 'custom_fields' => isset($task_data->custom_fields) ? $task_data->custom_fields : [],
                 'notes' => $task_data->notes,
@@ -383,28 +396,43 @@ class Exporter {
         $count_notes = 0;
         $count_comments = 0;
         $headers = [];
-        foreach ($flattened as $flat) {
+        foreach ($flattened as $key => $flat) {
             if (is_array($flat)) {
-                $headers = array_merge($headers, array_keys($flat));
+                $flattened[$key] = $this->flattenToCsv($flat);
+                $headers = array_merge($headers, array_keys($flattened[$key]));
+            } elseif (is_object($flat)) {
+                $headers = array_merge($headers, array_keys(get_object_vars($flat)));
             }
         }
         $headers = array_unique($headers);
         sort($headers);
         $fh = fopen($working_directory . DIRECTORY_SEPARATOR . 'tasks.csv', 'w');
-        fputcsv($fh, $headers);
+        fputcsv($fh, $headers,'|');
         foreach ($flattened as $row) {
             if (is_array($row)) {
                 $tmp = [];
                 foreach ($headers as $header) {
-                    $tmp[$header] = isset($row[$header]) ? $row[$header] : '';
+                    if (isset($row[$header]) && is_array($row[$header])) {
+                        $i = 0;
+                        foreach($row[$header] as $f){
+                            $tmp[$header.$i] = is_array($f)?$this->flattenToCsv($f):$f;
+                            $i++;
+                        }
+                    } else {
+                        $tmp[$header] = isset($row[$header]) ? $row[$header] : null;
+                    }
                 }
-                fputcsv($fh, $tmp);
+                fputcsv($fh, $tmp, '|');
             } elseif (is_object($row) && $row instanceof \stdClass) {
                 $tmp = [];
                 foreach ($headers as $header) {
-                    $tmp[$header] = isset($row->$header) ? $row->$header : '';
+                    if (isset($row->$header) && is_array($row->$header)) {
+                        $tmp[$header] = $this->flatten($row->$header, 2);
+                    } else {
+                        $tmp[$header] = isset($row->$header) ? $row->$header : '';
+                    }
                 }
-                fputcsv($fh, $tmp);
+                fputcsv($fh, $tmp, '|');
             } else {
                 fwrite($fh, $row);
             }
@@ -439,25 +467,25 @@ class Exporter {
         $flattened = $this->flatten([$project]);
         $fh = fopen($working_directory . DIRECTORY_SEPARATOR . 'project.csv', 'w');
         $flattened[0]->team = $flattened[0]->team->name;
-        fputcsv($fh, ['gid' => $flattened[0]->gid, 'name' => $flattened[0]->name, 'resource_type' => $flattened[0]->resource_type, 'team' => $flattened[0]->team]);
-        fputcsv($fh, []);
-        fputcsv($fh, []);
+        fputcsv($fh, ['gid' => $flattened[0]->gid, 'name' => $flattened[0]->name, 'resource_type' => $flattened[0]->resource_type, 'team' => $flattened[0]->team],'|');
+        fputcsv($fh, [],'|');
+        fputcsv($fh, [],'|');
         $headers = null;
         $project_statuses = isset($project->status) ? $project->status : [];
         if ($project_statuses != []) {
             $flattened = $this->flattenToCsv($project_statuses);
-            fputcsv($fh, []);
-            fputcsv($fh, []);
-            fputcsv($fh, $this->statusHeaders);
+            fputcsv($fh, [],'|');
+            fputcsv($fh, [],'|');
+            fputcsv($fh, $this->statusHeaders,'|');
             foreach ($flattened as $row) {
                 if (is_array($row)) {
-                    fputcsv($fh, $row);
+                    fputcsv($fh, $row,'|');
                 } elseif (is_object($row) && $row instanceof \stdClass) {
                     $tmp = [];
                     foreach ($this->statusHeaders as $header) {
                         $tmp[$header] = isset($row->$header) ? $row->$header : '';
                     }
-                    fputcsv($fh, $tmp);
+                    fputcsv($fh, $tmp,'|');
                 } else {
                     fwrite($fh, $row);
                 }
@@ -501,7 +529,7 @@ class Exporter {
             if (!is_array($val)) {
                 $res[$key] = $val;
             } elseif (is_array($val) && $depth < 3) {
-                $res[$key] = $this->flattenToCsv($val, $depth + 1);
+                $res[$key] = $this->flatten($val, $depth + 1);
             } else {
                 $res[$key] = json_encode($val);
             }
@@ -537,6 +565,7 @@ class Exporter {
         $client = $this->getClient();
         $ret = [];
         foreach ($client->statusupdates->getStatusesForObject(['parent' => $project->gid], ['iterator_type' => false, 'page_size' => null, 'opt_fields' => implode(',', $this->statusHeaders)]) as $row) {
+            $this->requested = true;
             $this->restTime();
             $ret[] = $row;
         }
@@ -545,6 +574,7 @@ class Exporter {
 
     public function getTeamProjects(stdClass $team) {
         $client = $this->getClient();
+        $this->requested = true;
         return $client->projects->getProjects(['team' => $team->gid], ['iterator_type' => false, 'page_size' => null])->data;
     }
 
@@ -555,10 +585,12 @@ class Exporter {
         } else {
             $res = $client->teams->getTeamsForWorkspace($workspace->gid, ['limit' => 100]);
         }
+        $this->requested = true;
         $this->restTime();
         $teams = [];
         if (isset($res->pages->next_page)) {
             $teams = $this->getTeamProjects($workspace, $res->pages->next_page->offset);
+            $this->requested = true;
         }
         foreach ($res as $team) {
             $teams[] = $team;
@@ -576,6 +608,7 @@ class Exporter {
     public function getMe() {
         if (is_null($this->me)) {
             $this->me = $this->getClient()->users->getUser('me');
+            $this->requested = true;
         }
         return $this->me;
     }
